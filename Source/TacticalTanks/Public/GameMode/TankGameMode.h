@@ -17,6 +17,7 @@ class TACTICALTANKS_API ATankGameMode : public AGameModeBase
 public:
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 	void OnPlayerKilled(APlayerController* ScoringPlayer, APlayerController* Victim);
+	virtual void PostLogin(APlayerController* NewPlayer) override;
 protected:
 
 	virtual void BeginPlay() override;
@@ -25,4 +26,11 @@ private:
 
 	bool PlayerStartsInitialized = false;
 	bool IsPlayerStartAvailable(APlayerStart* PlayerStart) const;
+
+	/* Player Colors*/
+	UPROPERTY(EditAnywhere, Category = "Player Colors")
+	TMap<int32, FLinearColor> PlayerColors;
+
+	int32 CurrentPlayerCount = 0;
+
 };

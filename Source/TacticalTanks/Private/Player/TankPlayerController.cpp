@@ -27,6 +27,13 @@ void ATankPlayerController::HandleRespawn(ATankPawn* InNewTank)
 	}
 }
 
+void ATankPlayerController::SetPlayerColor(FLinearColor InColor)
+{
+	PlayerColor = InColor; 
+	bPlayerColorSet = true;
+	OnColorChanged.Broadcast(PlayerColor);
+}
+
 
 void ATankPlayerController::BeginPlay()
 {
@@ -71,10 +78,8 @@ void ATankPlayerController::PlayerTick(float DeltaTime)
 	}
 }
 
-
 void ATankPlayerController::LeftMouseButtonPressed()
 {
-	UE_LOG(LogTemp, Warning,TEXT("LeftMouseButtonPressed"));
 	FHitResult CursorHit;
 	GetHitResultUnderCursor(ECC_Visibility, false, CursorHit);
 

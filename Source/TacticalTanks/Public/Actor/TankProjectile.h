@@ -28,14 +28,23 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UProjectileMovementComponent> ProjectileMovement;
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, Category = "TankProjectile|Parameters")
 	float LifeSpan = 15.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "TankProjectile|Parameters")
+	float InitialSpeed = 700.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "TankProjectile|Parameters")
+	float MaxSpeed = 700.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "TankProjectile|Parameters")
+	float GravityScale = 0.25f;
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<USphereComponent> Sphere;
 
 
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, Category = "TankProjectile|Parameters")
 	TObjectPtr<UParticleSystem>  ImpactParticles;
 
 };

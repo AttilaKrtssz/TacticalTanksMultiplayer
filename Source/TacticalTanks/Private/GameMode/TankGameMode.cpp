@@ -64,6 +64,22 @@ void ATankGameMode::OnPlayerKilled(APlayerController* ScoringPlayer, APlayerCont
     }
 }
 
+void ATankGameMode::PostLogin(APlayerController* NewPlayer)
+{
+    Super::PostLogin(NewPlayer);
+
+    // Assign color to the new player.
+    ATankPlayerController* NewPC = Cast<ATankPlayerController>(NewPlayer);
+    FLinearColor NewPlayersColor = FLinearColor::White;
+    if (PlayerColors.Contains(CurrentPlayerCount))
+    {
+        NewPlayersColor = PlayerColors[CurrentPlayerCount];
+    }
+    if (NewPC) NewPC->SetPlayerColor(NewPlayersColor);
+
+    CurrentPlayerCount++;
+}
+
 void ATankGameMode::BeginPlay()
 {
 	Super::BeginPlay();
@@ -82,10 +98,8 @@ void ATankGameMode::BeginPlay()
 bool ATankGameMode::IsPlayerStartAvailable(APlayerStart* PlayerStart) const
 {
     FCollisionShape CollisionShape = FCollisionShape::MakeSphere(50.f);
-    DrawDebugSphere(GetWorld(), PlayerStart->GetActorLocation(), 50.f, 10, FColor::Cyan, true);
     FCollisionQueryParams QueryParams;
     QueryParams.AddIgnoredActor(PlayerStart);
     bool bOverlapTestResult = GetWorld()->OverlapAnyTestByChannel(PlayerStart->GetActorLocation(), FQuat::Identity, ECC_Pawn, CollisionShape, QueryParams);
-    UE_LOG(LogTemp, Warning, TEXT("Overlap test result is = %d"), bOverlapTestResult);
     return !GetWorld()->OverlapAnyTestByChannel(PlayerStart->GetActorLocation(), FQuat::Identity, ECC_Pawn, CollisionShape, QueryParams);
 }

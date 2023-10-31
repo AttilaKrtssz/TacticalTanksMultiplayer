@@ -10,7 +10,7 @@
 #include "Actor/TankProjectile.h"
 #include <Net/UnrealNetwork.h>
 #include "Engine/Engine.h"
-
+#include "Player/TankPlayerController.h"
 ATankPawn::ATankPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -42,12 +42,27 @@ ATankPawn::ATankPawn()
 
 }
 
+
+
 void ATankPawn::BeginPlay()
 {
 	Super::BeginPlay();
 	
 }
+void ATankPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	DOREPLIFETIME(ATankPawn, ServerTargetTopYaw);
+	DOREPLIFETIME(ATankPawn, ReplicatedPathPoints);
+	DOREPLIFETIME(ATankPawn, TankColor);
+}
 
+void ATankPawn::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (bAutoMove) HandleTankMovement(DeltaTime);
+	InterpolateBarrelTowardsAimTarget(DeltaTime);
+}
 void ATankPawn::HandleTankMovement(float DeltaTime)
 {
 	// Calculate how far the tank should move this frame
@@ -78,6 +93,42 @@ void ATankPawn::HandleTankMovement(float DeltaTime)
 	}
 }
 
+void ATankPawn::InterpolateBarrelTowardsAimTarget(float DeltaTime)
+{
+	float TargetYaw = IsLocallyControlled() ? ClientTargetTopYaw : ServerTargetTopYaw;
+	FRotator CurrentTopRotation = TopMesh->GetComponentRotation();
+	FRotator NewRotation = FMath::RInterpTo(CurrentTopRotation, FRotator(CurrentTopRotation.Pitch, TargetYaw, CurrentTopRotation.Roll), DeltaTime, AimRotationRate);
+	TopMesh->SetWorldRotation(FRotator(NewRotation));
+}
+
+
+
+
+void ATankPawn::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	ATankPlayerController* PC = Cast<ATankPlayerController>(NewController);
+	if (PC)
+	{
+		if (PC->IsPlayerColorSet())
+		{
+			TankColor = PC->GetPlayerColor();
+			OnRep_TankColor();
+		}
+		else
+		{
+			PC->OnColorChanged.AddDynamic(this, &ATankPawn::HandleColorChange);
+		}
+	}
+}
+
+void ATankPawn::OnRep_ReplicatedPathPoints()
+{
+	if (IsLocallyControlled()) return; // We handle the Locally Controlled tank when we generate the points
+	CreateSplineAndStartMoving(ReplicatedPathPoints);
+}
+
 void ATankPawn::CreateSplineAndStartMoving(const TArray<FVector>& PathPoints)
 {
 	NavigationSpline->ClearSplinePoints();
@@ -95,28 +146,41 @@ void ATankPawn::CreateSplineAndStartMoving(const TArray<FVector>& PathPoints)
 	}
 }
 
-void ATankPawn::OnRep_ReplicatedPathPoints()
+void ATankPawn::HandleColorChange(FLinearColor Color)
 {
-	if (IsLocallyControlled()) return; // We handle the Locally Controlled tank when we generate the points
-	CreateSplineAndStartMoving(ReplicatedPathPoints);
+	TankColor = Color;
+	OnRep_TankColor();
 }
 
-void ATankPawn::InterpolateBarrelTowardsAimTarget(float DeltaTime)
+void ATankPawn::OnRep_TankColor()
 {
-	float TargetYaw = IsLocallyControlled() ? ClientTargetTopYaw : ServerTargetTopYaw;
-	FRotator CurrentTopRotation = TopMesh->GetComponentRotation();
-	FRotator NewRotation = FMath::RInterpTo(CurrentTopRotation, FRotator(CurrentTopRotation.Pitch, TargetYaw, CurrentTopRotation.Roll), DeltaTime, AimRotationRate);
-	TopMesh->SetWorldRotation(FRotator(NewRotation));
+	SetColor(TankColor);
 }
 
-void ATankPawn::TimedTopYawUpdate()
+void ATankPawn::SetColor(FLinearColor Color)
 {
-	ServerUpdateServerTargetTopYaw(ClientTargetTopYaw);
+	if (TankMaterialInstance == nullptr) return;
+	UMaterialInstanceDynamic* DynamicMaterial = UMaterialInstanceDynamic::Create(TankMaterialInstance, this);
+	if (DynamicMaterial)
+	{
+		DynamicMaterial->SetVectorParameterValue(FName("Color"), Color);
+		BaseMesh->SetMaterial(0, DynamicMaterial);
+		TopMesh->SetMaterial(0, DynamicMaterial);
+		BarrelMesh->SetMaterial(0, DynamicMaterial);
+	}
+
 }
+
 
 void ATankPawn::ServerUpdateServerTargetTopYaw_Implementation(float ClientTopYaw)
 {
 	ServerTargetTopYaw = ClientTopYaw;
+}
+
+
+void ATankPawn::FireButtonPressed()
+{
+	ServerFire();
 }
 
 void ATankPawn::ServerFire_Implementation()
@@ -143,13 +207,6 @@ bool ATankPawn::ServerFire_Validate()
 }
 
 
-void ATankPawn::AutoMove(float DeltaTime)
-{
-	if (!bAutoMove) return;
-	
-	HandleTankMovement(DeltaTime);
-}
-
 void ATankPawn::ServerSetNewMoveToDestination_Implementation(const TArray<FVector>& PathPoints)
 {
 	ReplicatedPathPoints = PathPoints;
@@ -161,19 +218,6 @@ bool ATankPawn::ServerSetNewMoveToDestination_Validate(const TArray<FVector>& Pa
 	return true;
 }
 
-void ATankPawn::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
-	AutoMove(DeltaTime);
-	InterpolateBarrelTowardsAimTarget(DeltaTime);
-}
-
-void ATankPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
-{
-	DOREPLIFETIME(ATankPawn, ServerTargetTopYaw);
-	DOREPLIFETIME(ATankPawn, ReplicatedPathPoints);
-}
 
 
 void ATankPawn::SetNewMoveToDestination(const FVector& NewLocation)
@@ -218,8 +262,7 @@ void ATankPawn::SetNewAimTarget(const FVector& NewAimTarget)
 
 }
 
-void ATankPawn::FireButtonPressed()
+void ATankPawn::TimedTopYawUpdate()
 {
-	ServerFire();
+	ServerUpdateServerTargetTopYaw(ClientTargetTopYaw);
 }
-
