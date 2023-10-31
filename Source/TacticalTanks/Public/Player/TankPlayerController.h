@@ -19,16 +19,24 @@ class TACTICALTANKS_API ATankPlayerController : public APlayerController
 	
 public:
 	ATankPlayerController();
+
+	void HandleRespawn(ATankPawn* InNewTank);
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
 	virtual void PlayerTick(float DeltaTime) override;
+
+	UPROPERTY()
+	TObjectPtr<ATankPawn> NewTank;
 private:
 	UPROPERTY(EditAnywhere, Category = "Input")
 	TObjectPtr<UInputMappingContext> TankContext;
 
 	UPROPERTY()
 	TObjectPtr<ATankPawn> ControlledTank;
+
+
 
 	UPROPERTY(EditAnywhere, Category = "Input")
 	TObjectPtr<UInputAction> LMBAction;
@@ -40,4 +48,14 @@ private:
 	void LeftMouseButtonPressed();
 	void FireButtonPressed();
 	ATankPawn* GetControlledTank();
+	
+	UFUNCTION()
+	void FinishRespawn();
+
+	UFUNCTION()
+	void BlendCameraToNewTank();
+
+	UFUNCTION(Client,Reliable)
+	void Client_SetViewTarget(AActor* NewViewTarget);
+
 };

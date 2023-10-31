@@ -103,8 +103,6 @@ void ATankPawn::OnRep_ReplicatedPathPoints()
 
 void ATankPawn::InterpolateBarrelTowardsAimTarget(float DeltaTime)
 {
-	FString DebugMessage = FString::Printf(TEXT("ServerTargetTopYaw = %f"), ServerTargetTopYaw);
-	GEngine->AddOnScreenDebugMessage(1, 5.f, FColor::Red, DebugMessage);
 	float TargetYaw = IsLocallyControlled() ? ClientTargetTopYaw : ServerTargetTopYaw;
 	FRotator CurrentTopRotation = TopMesh->GetComponentRotation();
 	FRotator NewRotation = FMath::RInterpTo(CurrentTopRotation, FRotator(CurrentTopRotation.Pitch, TargetYaw, CurrentTopRotation.Roll), DeltaTime, AimRotationRate);
@@ -113,7 +111,6 @@ void ATankPawn::InterpolateBarrelTowardsAimTarget(float DeltaTime)
 
 void ATankPawn::TimedTopYawUpdate()
 {
-	UE_LOG(LogTemp, Warning, TEXT("TimedTopYawUpdatecalled with client targetTopYaw: %f"), ClientTargetTopYaw);
 	ServerUpdateServerTargetTopYaw(ClientTargetTopYaw);
 }
 

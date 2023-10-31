@@ -13,6 +13,20 @@ ATankPlayerController::ATankPlayerController()
 
 }
 
+void ATankPlayerController::HandleRespawn(ATankPawn* InNewTank)
+{
+	ControlledTank = nullptr;
+	NewTank = InNewTank;
+	if (NewTank)
+	{
+		FTimerHandle CameraBlendTimer;
+		GetWorldTimerManager().SetTimer(CameraBlendTimer, this, &ATankPlayerController::BlendCameraToNewTank, 0.2f, false);
+
+		FTimerHandle RespawnTimer;
+		GetWorldTimerManager().SetTimer(RespawnTimer, this, &ATankPlayerController::FinishRespawn, 2.f, false);
+	}
+}
+
 
 void ATankPlayerController::BeginPlay()
 {
@@ -60,6 +74,7 @@ void ATankPlayerController::PlayerTick(float DeltaTime)
 
 void ATankPlayerController::LeftMouseButtonPressed()
 {
+	UE_LOG(LogTemp, Warning,TEXT("LeftMouseButtonPressed"));
 	FHitResult CursorHit;
 	GetHitResultUnderCursor(ECC_Visibility, false, CursorHit);
 
@@ -81,9 +96,27 @@ void ATankPlayerController::FireButtonPressed()
 ATankPawn* ATankPlayerController::GetControlledTank()
 {
 	// First time it will return false, then we return the stored reference to avoid casting
-	if (ControlledTank == nullptr)
+	if (!IsValid(ControlledTank))
 	{
 		ControlledTank = Cast<ATankPawn>(GetPawn());
 	}
 	return ControlledTank;
+}
+
+void ATankPlayerController::FinishRespawn()
+{
+	if (NewTank)
+	{
+		Possess(NewTank);
+	}
+}
+
+void ATankPlayerController::BlendCameraToNewTank()
+{
+	if (NewTank) Client_SetViewTarget(NewTank);
+}
+
+void ATankPlayerController::Client_SetViewTarget_Implementation(AActor* NewViewTarget)
+{
+	SetViewTargetWithBlend(NewViewTarget,1.5f);
 }

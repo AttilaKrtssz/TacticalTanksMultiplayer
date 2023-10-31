@@ -16,10 +16,13 @@ class TACTICALTANKS_API ATankGameMode : public AGameModeBase
 	GENERATED_BODY()
 public:
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+	void OnPlayerKilled(APlayerController* ScoringPlayer, APlayerController* Victim);
 protected:
 
 	virtual void BeginPlay() override;
 private:
 	TArray<TObjectPtr<APlayerStart>> AvailablePlayerStarts;
+
+	bool PlayerStartsInitialized = false;
 	bool IsPlayerStartAvailable(APlayerStart* PlayerStart) const;
 };

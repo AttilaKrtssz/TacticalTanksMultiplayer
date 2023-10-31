@@ -5,6 +5,9 @@
 #include "Components/SphereComponent.h"
 #include "GameFramework/ProjectileMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Actor/TankPawn.h"
+#include "GameMode/TankGameMode.h"
+#include "GameFramework/PlayerController.h"
 
 ATankProjectile::ATankProjectile()
 {
@@ -51,13 +54,20 @@ void ATankProjectile::Destroyed()
 
 void ATankProjectile::OnSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	if (GetInstigator() == OtherActor) return;
+	if (GetInstigator() == OtherActor || OtherActor == nullptr) return;
 	// Called only on the server
-	if (OtherActor)
+	if (ATankPawn* OtherTank = Cast<ATankPawn>(OtherActor)) // Would implement a combat interface, but this should be OK for now
 	{
-
-		// Cast OtherActor to the TankPawn, if it is successfull, add score to the owning controller/pawn
-		Destroy();
+		ATankGameMode* GameMode = Cast<ATankGameMode>(GetWorld()->GetAuthGameMode());
+		APlayerController* ScoringPC = Cast<APlayerController>(GetOwner());
+		APlayerController* VictimPC = Cast<APlayerController>(OtherTank->GetController());
+		if (GameMode)
+		{
+			GameMode->OnPlayerKilled(ScoringPC, VictimPC);
+		}
+		OtherTank->Destroy();
 	}
+	Destroy();
+
 }
 
