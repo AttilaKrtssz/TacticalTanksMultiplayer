@@ -75,6 +75,14 @@ private:
 	UFUNCTION(Server,Reliable,WithValidation)
 	void ServerSetNewMoveToDestination(const TArray<FVector>& PathPoints);
 
+	UPROPERTY(ReplicatedUsing = OnRep_ReplicatedPathPoints)
+	TArray<FVector> ReplicatedPathPoints;
+
+	void CreateSplineAndStartMoving(const TArray<FVector>& PathPoints);
+
+	UFUNCTION()
+	void OnRep_ReplicatedPathPoints();
+
 	/* Tank Movement related variable*/
 	UPROPERTY(EditAnywhere, Category = "Movement")
 	float TankSpeed = 200.f;  // Speed of the tank in units per second
@@ -97,19 +105,22 @@ private:
 
 	UPROPERTY(Replicated)
 	float ServerTargetTopYaw = 0.0f;
-
 	void InterpolateBarrelTowardsAimTarget(float DeltaTime);
+
+	FTimerHandle UpdateServerAimYawTimer;
+	float UpdateServerTopYawFrequency = 0.2f;
+
+	UFUNCTION()
+	void TimedTopYawUpdate();
+
+	UFUNCTION(Server, Reliable)
+	void ServerUpdateServerTargetTopYaw(float ClientTopYaw);
+
 
 	UFUNCTION(Server,Reliable,WithValidation)
 	void ServerFire();
 
-	float UpdateServerTopYawFrequency = 0.2f;
+
+
 	
-	UFUNCTION()
-	void TimedTopYawUpdate();
-
-	UFUNCTION(Server,Reliable)
-	void ServerUpdateServerTargetTopYaw(float ClientTopYaw);
-
-	FTimerHandle UpdateServerAimYawTimer;
 };

@@ -78,6 +78,29 @@ void ATankPawn::HandleTankMovement(float DeltaTime)
 	}
 }
 
+void ATankPawn::CreateSplineAndStartMoving(const TArray<FVector>& PathPoints)
+{
+	NavigationSpline->ClearSplinePoints();
+	DistanceTraveled = 0;
+
+	for (const FVector& PointLoc : PathPoints)
+	{
+		NavigationSpline->AddSplinePoint(PointLoc, ESplineCoordinateSpace::World);
+	}
+
+	if (PathPoints.Num() > 0)
+	{
+		CachedDestination = PathPoints[PathPoints.Num() - 1];
+		bAutoMove = true;
+	}
+}
+
+void ATankPawn::OnRep_ReplicatedPathPoints()
+{
+	if (IsLocallyControlled()) return; // We handle the Locally Controlled tank when we generate the points
+	CreateSplineAndStartMoving(ReplicatedPathPoints);
+}
+
 void ATankPawn::InterpolateBarrelTowardsAimTarget(float DeltaTime)
 {
 	FString DebugMessage = FString::Printf(TEXT("ServerTargetTopYaw = %f"), ServerTargetTopYaw);
@@ -132,18 +155,8 @@ void ATankPawn::AutoMove(float DeltaTime)
 
 void ATankPawn::ServerSetNewMoveToDestination_Implementation(const TArray<FVector>& PathPoints)
 {
-	DistanceTraveled = 0;
-	NavigationSpline->ClearSplinePoints();
-	for (const FVector& PointLoc : PathPoints)
-	{
-		NavigationSpline->AddSplinePoint(PointLoc, ESplineCoordinateSpace::World);
-	}
-
-	if (PathPoints.Num() > 0)
-	{
-		CachedDestination = PathPoints[PathPoints.Num() - 1];
-		bAutoMove = true;
-	}
+	ReplicatedPathPoints = PathPoints;
+	OnRep_ReplicatedPathPoints();
 }
 bool ATankPawn::ServerSetNewMoveToDestination_Validate(const TArray<FVector>& PathPoints)
 {
@@ -162,32 +175,24 @@ void ATankPawn::Tick(float DeltaTime)
 void ATankPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	DOREPLIFETIME(ATankPawn, ServerTargetTopYaw);
+	DOREPLIFETIME(ATankPawn, ReplicatedPathPoints);
 }
 
 
 void ATankPawn::SetNewMoveToDestination(const FVector& NewLocation)
 {
-	DistanceTraveled = 0.f;
 	CachedDestination = NewLocation;
 
 	if (UNavigationPath* NavPath = UNavigationSystemV1::FindPathToLocationSynchronously(this, GetActorLocation(), CachedDestination))
 	{
-		NavigationSpline->ClearSplinePoints();
-		for (const FVector& PointLoc : NavPath->PathPoints)
+		CreateSplineAndStartMoving(NavPath->PathPoints); // We handle the movement for the locally controlled tank
+		if (HasAuthority())
 		{
-			NavigationSpline->AddSplinePoint(PointLoc, ESplineCoordinateSpace::World);
-			DrawDebugSphere(GetWorld(), PointLoc, 10, 10, FColor::Green, false, 10.f);
+			ReplicatedPathPoints = NavPath->PathPoints; // Set the replicated variable, so the clients start moving as well
 		}
-		if (NavPath->PathPoints.Num() > 0)
+		else
 		{
-			// Use the last point found by the NavigationSystem 
-			CachedDestination = NavPath->PathPoints[NavPath->PathPoints.Num() - 1];
-			bAutoMove = true;
-
-			if (IsLocallyControlled() && !HasAuthority())
-			{
-				ServerSetNewMoveToDestination(NavPath->PathPoints);
-			}
+			ServerSetNewMoveToDestination(NavPath->PathPoints); // Send the PathPoints to the server and start moving
 		}
 	}
 }
