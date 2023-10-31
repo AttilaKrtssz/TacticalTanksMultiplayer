@@ -44,6 +44,19 @@ void ATankPlayerController::SetupInputComponent()
 	EnhancedInputComponent->BindAction(FireAction, ETriggerEvent::Triggered, this, &ATankPlayerController::FireButtonPressed);
 }
 
+void ATankPlayerController::PlayerTick(float DeltaTime)
+{
+	Super::PlayerTick(DeltaTime);
+
+	FHitResult CursorHit;
+	GetHitResultUnderCursor(ECC_Visibility, false, CursorHit);
+	
+	if (CursorHit.bBlockingHit && GetControlledTank())
+	{
+		ControlledTank->SetNewAimTarget(CursorHit.ImpactPoint);
+	}
+}
+
 
 void ATankPlayerController::LeftMouseButtonPressed()
 {
@@ -59,7 +72,10 @@ void ATankPlayerController::LeftMouseButtonPressed()
 
 void ATankPlayerController::FireButtonPressed()
 {
-	UE_LOG(LogTemp, Warning, TEXT("Fire button pressed"));
+	if (GetControlledTank())
+	{
+		ControlledTank->FireButtonPressed();
+	}
 }
 
 ATankPawn* ATankPlayerController::GetControlledTank()
