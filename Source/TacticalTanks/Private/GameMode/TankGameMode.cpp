@@ -15,22 +15,15 @@ AActor* ATankGameMode::ChoosePlayerStart_Implementation(AController* Player)
         return Super::ChoosePlayerStart_Implementation(Player);
 
     int32 RandomIndex;
-    APlayerStart* RandomPlayerStart = nullptr;
-
-    while (AvailablePlayerStarts.Num() > 0)
+    int32 NumberOfRandomTries = 10;
+    for (int32 i = 0; i < NumberOfRandomTries; i++)
     {
-        // Get a random index
         RandomIndex = FMath::RandRange(0, AvailablePlayerStarts.Num() - 1);
-
-        // Get the player start at the random index
-        RandomPlayerStart = AvailablePlayerStarts[RandomIndex];
-
-        if (IsPlayerStartAvailable(RandomPlayerStart))
+        if (IsPlayerStartAvailable(AvailablePlayerStarts[RandomIndex]))
         {
-            return RandomPlayerStart;
+            return AvailablePlayerStarts[RandomIndex];
         }
     }
-
     // Fallback to the default behavior if no suitable player start is found
     return Super::ChoosePlayerStart_Implementation(Player);
 }
@@ -46,9 +39,8 @@ void ATankGameMode::OnPlayerKilled(APlayerController* ScoringPlayer, APlayerCont
     if (World && Victim)
     {
         AActor* PlayerStart = ChoosePlayerStart(Victim);
-        // Get a spawn point, it can be any logic you have for selecting player starts or a random location
-        FVector SpawnLocation = PlayerStart ? PlayerStart->GetActorLocation() : FVector(0);  // Example, you can modify this
-        FRotator SpawnRotation = PlayerStart ? PlayerStart->GetActorRotation() : FRotator(0);  // Example, you can modify this
+        FVector SpawnLocation = PlayerStart ? PlayerStart->GetActorLocation() : FVector(0);  
+        FRotator SpawnRotation = PlayerStart ? PlayerStart->GetActorRotation() : FRotator(0);  
 
         // Spawn the tank
         ATankPawn* NewTank = World->SpawnActor<ATankPawn>(DefaultPawnClass, SpawnLocation, SpawnRotation);

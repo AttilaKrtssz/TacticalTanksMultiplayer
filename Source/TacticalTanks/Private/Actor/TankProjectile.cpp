@@ -34,7 +34,6 @@ void ATankProjectile::BeginPlay()
 {
 	Super::BeginPlay();
 
-	UE_LOG(LogTemp, Warning, TEXT("Tank Projectile Spawned"));
 	if (HasAuthority())
 	{
 		SetLifeSpan(LifeSpan);

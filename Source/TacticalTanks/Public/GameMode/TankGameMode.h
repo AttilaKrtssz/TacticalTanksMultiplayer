@@ -24,7 +24,7 @@ protected:
 private:
 	TArray<TObjectPtr<APlayerStart>> AvailablePlayerStarts;
 
-	bool PlayerStartsInitialized = false;
+	// We create a Sphere Trace check, if there is something blocking the player start
 	bool IsPlayerStartAvailable(APlayerStart* PlayerStart) const;
 
 	/* Player Colors*/

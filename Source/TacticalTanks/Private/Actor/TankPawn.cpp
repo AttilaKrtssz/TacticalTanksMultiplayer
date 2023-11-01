@@ -69,8 +69,38 @@ void ATankPawn::InterpolateBarrelTowardsAimTarget(float DeltaTime)
 	TopMesh->SetWorldRotation(FRotator(NewRotation));
 }
 
+void ATankPawn::SetNewAimTarget(const FVector& NewAimTarget)
+{
+	AimTarget = NewAimTarget;
 
+	FVector DirectionToTarget = (AimTarget - GetActorLocation()).GetSafeNormal();
+	if (HasAuthority())
+	{
+		ServerTargetTopYaw = DirectionToTarget.Rotation().Yaw;
+		if (IsLocallyControlled())
+		{
+			ClientTargetTopYaw = ServerTargetTopYaw;
+		}
+	}
+	else
+	{
+		ClientTargetTopYaw = DirectionToTarget.Rotation().Yaw;
+		if (!GetWorld()->GetTimerManager().IsTimerActive(UpdateServerAimYawTimer))
+		{
+			GetWorld()->GetTimerManager().SetTimer(UpdateServerAimYawTimer, this, &ATankPawn::TimedTopYawUpdate, UpdateServerTopYawFrequency, true);
+		}
+	}
 
+}
+
+void ATankPawn::TimedTopYawUpdate()
+{
+	ServerUpdateServerTargetTopYaw(ClientTargetTopYaw);
+}
+void ATankPawn::ServerUpdateServerTargetTopYaw_Implementation(float ClientTopYaw)
+{
+	ServerTargetTopYaw = ClientTopYaw;
+}
 
 void ATankPawn::PossessedBy(AController* NewController)
 {
@@ -79,23 +109,23 @@ void ATankPawn::PossessedBy(AController* NewController)
 	ATankPlayerController* PC = Cast<ATankPlayerController>(NewController);
 	if (PC)
 	{
+		PC->OnColorChanged.AddDynamic(this, &ATankPawn::HandleColorChange);
 		if (PC->IsPlayerColorSet())
 		{
 			TankColor = PC->GetPlayerColor();
 			OnRep_TankColor();
 		}
-		else
-		{
-			PC->OnColorChanged.AddDynamic(this, &ATankPawn::HandleColorChange);
-		}
 	}
 }
 
-
+void ATankPawn::SetTankColor(FLinearColor NewColor)
+{
+	TankColor = NewColor;
+	OnRep_TankColor();
+}
 void ATankPawn::HandleColorChange(FLinearColor Color)
 {
-	TankColor = Color;
-	OnRep_TankColor();
+	SetTankColor(Color);
 }
 
 void ATankPawn::OnRep_TankColor()
@@ -118,11 +148,6 @@ void ATankPawn::SetColor(FLinearColor Color)
 }
 
 
-void ATankPawn::ServerUpdateServerTargetTopYaw_Implementation(float ClientTopYaw)
-{
-	ServerTargetTopYaw = ClientTopYaw;
-}
-
 
 void ATankPawn::FireButtonPressed()
 {
@@ -134,11 +159,6 @@ void ATankPawn::FireButtonPressed()
 	GetWorldTimerManager().SetTimer(ResetCanFireHandle, this, &ATankPawn::ResetCanFire, FireRate, false);
 }
 
-void ATankPawn::SetTankColor(FLinearColor NewColor)
-{
-	TankColor = NewColor;
-	OnRep_TankColor();
-}
 
 void ATankPawn::ServerFire_Implementation()
 {
@@ -170,31 +190,3 @@ void ATankPawn::SetNewMoveToDestination(const FVector& NewLocation)
 	if (MovementComponent) MovementComponent->SetMoveToDestination(NewLocation);
 }
 
-void ATankPawn::SetNewAimTarget(const FVector& NewAimTarget)
-{
-	AimTarget = NewAimTarget;
-
-	FVector DirectionToTarget = (AimTarget - GetActorLocation()).GetSafeNormal();
-	if (HasAuthority())
-	{
-		ServerTargetTopYaw = DirectionToTarget.Rotation().Yaw;
-		if (IsLocallyControlled())
-		{
-			ClientTargetTopYaw = ServerTargetTopYaw;
-		}
-	}
-	else
-	{
-		ClientTargetTopYaw = DirectionToTarget.Rotation().Yaw;
-		if (!GetWorld()->GetTimerManager().IsTimerActive(UpdateServerAimYawTimer))
-		{
-			GetWorld()->GetTimerManager().SetTimer(UpdateServerAimYawTimer, this, &ATankPawn::TimedTopYawUpdate, UpdateServerTopYawFrequency, true);
-		}
-	}
-
-}
-
-void ATankPawn::TimedTopYawUpdate()
-{
-	ServerUpdateServerTargetTopYaw(ClientTargetTopYaw);
-}

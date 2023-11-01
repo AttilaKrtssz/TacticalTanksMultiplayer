@@ -11,13 +11,13 @@ struct FPlayerScore
 {
     GENERATED_USTRUCT_BODY()
 
-    TObjectPtr<APlayerState> PS;
+    TObjectPtr<APlayerState> PS = nullptr;
 
     UPROPERTY(BlueprintReadWrite, Category = "Scoring")
-    FText PlayerName;
+    FText PlayerName = FText::FromString("");
 
     UPROPERTY(BlueprintReadWrite, Category = "Scoring")
-    int32 Kills;
+    int32 Kills = 0;
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnScoresChanged);
