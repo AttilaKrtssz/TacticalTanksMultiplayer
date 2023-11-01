@@ -12,6 +12,6 @@ Respawn and smooth camera blend to the new pawn.
 Each player will receive a unique color, supports 7 players
 
 Needs improvement:
-The collision for the tank is not handled
-Going up/down on ramp
-Aiming, modify pitch rotation of the barrel
+-The collision for the tank is not handled
+-Going up/down on ramp.
+-Aiming, modify pitch rotation of the barrel
