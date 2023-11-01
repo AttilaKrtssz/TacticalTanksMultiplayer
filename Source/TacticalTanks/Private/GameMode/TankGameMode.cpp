@@ -59,6 +59,7 @@ void ATankGameMode::OnPlayerKilled(APlayerController* ScoringPlayer, APlayerCont
         }
         if (NewTank && TankPC)
         {
+            NewTank->SetTankColor(TankPC->GetPlayerColor());
             TankPC->HandleRespawn(NewTank);
         }
     }

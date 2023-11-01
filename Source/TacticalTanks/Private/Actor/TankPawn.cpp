@@ -4,13 +4,10 @@
 #include "Actor/TankPawn.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
-#include "NavigationSystem.h"
-#include "NavigationPath.h"
-#include "Components/SplineComponent.h"
 #include "Actor/TankProjectile.h"
 #include <Net/UnrealNetwork.h>
-#include "Engine/Engine.h"
 #include "Player/TankPlayerController.h"
+#include "Actor/Component/TankMovementComponent.h"
 ATankPawn::ATankPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -38,8 +35,9 @@ ATankPawn::ATankPawn()
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom);
 
-	NavigationSpline = CreateDefaultSubobject<USplineComponent>(TEXT("NavigationSpline"));
-
+	MovementComponent = CreateDefaultSubobject<UTankMovementComponent>(TEXT("TankMovementComponent"));
+	MovementComponent->SetIsReplicated(true);
+	
 }
 
 
@@ -51,47 +49,17 @@ void ATankPawn::BeginPlay()
 }
 void ATankPawn::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ATankPawn, ServerTargetTopYaw);
-	DOREPLIFETIME(ATankPawn, ReplicatedPathPoints);
 	DOREPLIFETIME(ATankPawn, TankColor);
 }
 
 void ATankPawn::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-	if (bAutoMove) HandleTankMovement(DeltaTime);
 	InterpolateBarrelTowardsAimTarget(DeltaTime);
 }
-void ATankPawn::HandleTankMovement(float DeltaTime)
-{
-	// Calculate how far the tank should move this frame
-	float DistanceToMove = TankSpeed * DeltaTime;
 
-	// Update the distance traveled along the spline
-	DistanceTraveled += DistanceToMove;
-
-	// Get the new location and tangent (forward direction) on the spline based on the distance traveled
-	FVector NewLocation = NavigationSpline->GetLocationAtDistanceAlongSpline(DistanceTraveled, ESplineCoordinateSpace::World);
-	NewLocation.Z += TankHeight;
-	FVector ForwardDirection = NavigationSpline->GetDirectionAtDistanceAlongSpline(DistanceTraveled, ESplineCoordinateSpace::World);
-
-	// Interpolate the tank's position smoothly to the new location
-	SetActorLocation(FMath::VInterpTo(GetActorLocation(), NewLocation, DeltaTime, 5.0f));
-
-	// Interpolate the tank's rotation smoothly to face the forward direction
-	FRotator TargetRotation = ForwardDirection.Rotation();
-	FRotator CurrentRotation = GetActorRotation();
-	FRotator NewRotation = FMath::RInterpConstantTo(CurrentRotation, TargetRotation, DeltaTime, TankRotationRate);
-	SetActorRotation(NewRotation);
-
-	// Check if the tank has reached the end of the spline (or is very close to it)
-	if (DistanceTraveled >= NavigationSpline->GetSplineLength() - AutoMoveAcceptanceRadius)
-	{
-		bAutoMove = false;
-		DistanceTraveled = 0.f;  // Reset for the next movement
-	}
-}
 
 void ATankPawn::InterpolateBarrelTowardsAimTarget(float DeltaTime)
 {
@@ -123,28 +91,6 @@ void ATankPawn::PossessedBy(AController* NewController)
 	}
 }
 
-void ATankPawn::OnRep_ReplicatedPathPoints()
-{
-	if (IsLocallyControlled()) return; // We handle the Locally Controlled tank when we generate the points
-	CreateSplineAndStartMoving(ReplicatedPathPoints);
-}
-
-void ATankPawn::CreateSplineAndStartMoving(const TArray<FVector>& PathPoints)
-{
-	NavigationSpline->ClearSplinePoints();
-	DistanceTraveled = 0;
-
-	for (const FVector& PointLoc : PathPoints)
-	{
-		NavigationSpline->AddSplinePoint(PointLoc, ESplineCoordinateSpace::World);
-	}
-
-	if (PathPoints.Num() > 0)
-	{
-		CachedDestination = PathPoints[PathPoints.Num() - 1];
-		bAutoMove = true;
-	}
-}
 
 void ATankPawn::HandleColorChange(FLinearColor Color)
 {
@@ -180,7 +126,18 @@ void ATankPawn::ServerUpdateServerTargetTopYaw_Implementation(float ClientTopYaw
 
 void ATankPawn::FireButtonPressed()
 {
+	if (!bCanFire) return;
+
 	ServerFire();
+	// Limit firing functionality, so the clients cannot spam server RPC's
+	bCanFire = false;
+	GetWorldTimerManager().SetTimer(ResetCanFireHandle, this, &ATankPawn::ResetCanFire, FireRate, false);
+}
+
+void ATankPawn::SetTankColor(FLinearColor NewColor)
+{
+	TankColor = NewColor;
+	OnRep_TankColor();
 }
 
 void ATankPawn::ServerFire_Implementation()
@@ -194,7 +151,7 @@ void ATankPawn::ServerFire_Implementation()
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.Owner = GetController();
 		SpawnParams.Instigator = this;
-		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButDontSpawnIfColliding;
 
 		// Spawn the projectile
 		ATankProjectile* SpawnedProjectile = GetWorld()->SpawnActor<ATankProjectile>(ProjectileClass, SpawnLocation, SpawnRotation, SpawnParams);
@@ -207,35 +164,10 @@ bool ATankPawn::ServerFire_Validate()
 }
 
 
-void ATankPawn::ServerSetNewMoveToDestination_Implementation(const TArray<FVector>& PathPoints)
-{
-	ReplicatedPathPoints = PathPoints;
-	OnRep_ReplicatedPathPoints();
-}
-bool ATankPawn::ServerSetNewMoveToDestination_Validate(const TArray<FVector>& PathPoints)
-{
-	// We can implement anti-cheat here, check if the Player was cheating
-	return true;
-}
-
-
 
 void ATankPawn::SetNewMoveToDestination(const FVector& NewLocation)
 {
-	CachedDestination = NewLocation;
-
-	if (UNavigationPath* NavPath = UNavigationSystemV1::FindPathToLocationSynchronously(this, GetActorLocation(), CachedDestination))
-	{
-		CreateSplineAndStartMoving(NavPath->PathPoints); // We handle the movement for the locally controlled tank
-		if (HasAuthority())
-		{
-			ReplicatedPathPoints = NavPath->PathPoints; // Set the replicated variable, so the clients start moving as well
-		}
-		else
-		{
-			ServerSetNewMoveToDestination(NavPath->PathPoints); // Send the PathPoints to the server and start moving
-		}
-	}
+	if (MovementComponent) MovementComponent->SetMoveToDestination(NewLocation);
 }
 
 void ATankPawn::SetNewAimTarget(const FVector& NewAimTarget)

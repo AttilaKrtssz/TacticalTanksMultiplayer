@@ -47,7 +47,11 @@ void ATankProjectile::Destroyed()
 {
 	if (ImpactParticles)
 	{
-		UGameplayStatics::SpawnEmitterAtLocation(GetWorld(), ImpactParticles, GetActorLocation());
+		UGameplayStatics::SpawnEmitterAtLocation(this, ImpactParticles, GetActorLocation());
+	}
+	if (ImpactSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, ImpactSound, GetActorLocation());
 	}
 	Super::Destroyed();
 }

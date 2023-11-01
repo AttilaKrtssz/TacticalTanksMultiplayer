@@ -47,4 +47,7 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "TankProjectile|Parameters")
 	TObjectPtr<UParticleSystem>  ImpactParticles;
 
+	UPROPERTY(EditAnywhere, Category = "TankProjectile|Parameters")
+	TObjectPtr<USoundBase> ImpactSound;
+
 };
